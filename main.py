@@ -1,18 +1,15 @@
+import os
+import asyncio
 import random
 import time
-import asyncio
 from threading import Thread
 
 from flask import Flask, request
-
 from telegram import Update, Bot
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # твой публичный URL Render
+TOKEN = "ТВОЙ_ТОКЕН_ЗДЕСЬ"  # Вставь свой токен сюда
+URL = "https://sinklit-bot.onrender.com"  # Твой публичный URL Render без порта
 
 app = Flask(__name__)
 
@@ -21,15 +18,13 @@ application = ApplicationBuilder().token(TOKEN).build()
 
 user_timers = {}
 
-# Список уток с редкостью и описанием
 loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "photo_path": "IMG_3704.jpeg",  # Убедись, что файл лежит в той же папке
+        "photo_path": "IMG_3704.jpeg",
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
-    },
-    # Добавь другие утки сюда, если нужно
+    }
 ]
 
 rarity_chances = {"🟢": 60, "🔵": 25, "🔴": 15}
@@ -46,10 +41,7 @@ def get_random_rarity():
 def get_random_loot():
     rarity = get_random_rarity()
     filtered = [item for item in loot_items if item["rarity"] == rarity]
-    if filtered:
-        return random.choice(filtered)
-    else:
-        return None
+    return random.choice(filtered) if filtered else None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
@@ -97,41 +89,30 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-
-    # Важно: запускаем обработку обновления в event loop
     asyncio.run(application.process_update(update))
-
     return "ok"
 
-def run():
-    app.run(host='0.0.0.0', port=10000)
-
-def keep_alive():
-    thread = Thread(target=run)
-    thread.start()
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 def main():
-    # Регистрируем хендлеры
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    # Инициализируем и запускаем вебхук
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(application.initialize())
-    loop.run_until_complete(bot.set_webhook(f"{URL}/{TOKEN}"))
-
-    print("✅ Вебхук установлен")
+    asyncio.run(application.initialize())
+    asyncio.run(bot.set_webhook(f"{URL}/{TOKEN}"))
+    print("✅ Webhook установлен")
     print("✅ Бот запущен! Ждём обновлений...")
 
-    # Запускаем Flask в отдельном потоке, чтобы он слушал запросы вебхука
-    keep_alive()
+    # Запускаем Flask в отдельном потоке
+    Thread(target=run_flask).start()
 
-    # Чтобы программа не завершалась — бесконечный цикл с паузами
-    while True:
-        time.sleep(10)
+    # Чтобы основной поток не завершался
+    asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":
     main()
+
 
 
