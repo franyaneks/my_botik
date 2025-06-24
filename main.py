@@ -1,16 +1,18 @@
-import asyncio
 import random
 import time
-from flask import Flask
+from flask import Flask, request
 from threading import Thread
 
-from telegram import Update, InputFile
+from telegram import Update
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters
 )
 
+TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
+
 # ====== KEEP_ALIVE (Flask) ======
-flask_app = Flask('')
+flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def home():
@@ -24,13 +26,14 @@ def keep_alive():
     t.start()
 
 # ====== Telegram Бот ======
+
 user_timers = {}
 
 loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "photo_path": "IMG_3704.jpeg",
+        "photo_path": r"C:\Users\navib\Downloads\photo_2025-06-09_15-48-23.jpg",  # Полный путь к картинке
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
     }
 ]
@@ -55,8 +58,7 @@ def get_random_loot():
     filtered_items = [item for item in loot_items if item["rarity"] == rarity]
     if filtered_items:
         return random.choice(filtered_items)
-    else:
-        return None
+    return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
@@ -107,17 +109,17 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
 
-# ====== Запуск ======
 if __name__ == '__main__':
     keep_alive()
 
-    app = ApplicationBuilder().token("7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4").build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
 
     print("✅ Бот запущен!")
     app.run_polling()
+
 
 
 
