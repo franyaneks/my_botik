@@ -3,6 +3,7 @@ import random
 import time
 import asyncio
 from threading import Thread
+
 from flask import Flask, request
 
 from telegram import Update, Bot
@@ -11,29 +12,25 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-# === Настройки ===
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # Укажи свой публичный URL Render или где хостишь
+URL = "https://sinklit-bot.onrender.com"  # твой URL Render
 
 app = Flask(__name__)
+
 bot = Bot(token=TOKEN)
 application = ApplicationBuilder().token(TOKEN).build()
 
-# Хранилище для таймеров пользователей
 user_timers = {}
 
-# Список лута (пример)
 loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
         "photo_path": "IMG_3704.jpeg",
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
-    },
-    # Можно добавить другие утки с разной редкостью и фото
+    }
 ]
 
-# Вероятности выпадения по редкости
 rarity_chances = {"🟢": 60, "🔵": 25, "🔴": 15}
 
 def get_random_rarity():
@@ -48,58 +45,45 @@ def get_random_rarity():
 def get_random_loot():
     rarity = get_random_rarity()
     filtered = [item for item in loot_items if item["rarity"] == rarity]
-    if not filtered:
-        return None
-    return random.choice(filtered)
-
-# === Обработчики Telegram ===
+    return random.choice(filtered) if filtered else None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
     await update.message.reply_text(
-        f"👋 Привет, {username}!\n\nНапиши 'кря', чтобы начать искать утку!"
+        f"👋 Привет, {username}!\n\nНапиши 🦆 <b>кря</b>, чтобы я начал искать утку!",
+        parse_mode="HTML"
     )
 
 async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     now = time.time()
 
-    # Если пользователь не в таймерах или таймер истёк — запускаем новый
     if user_id not in user_timers or now >= user_timers[user_id]['end']:
-        duration = random.randint(600, 3600)  # от 10 минут до 1 часа
+        duration = random.randint(600, 3600)
         user_timers[user_id] = {'end': now + duration}
         minutes = duration // 60
         await update.message.reply_text(
-            f"🔍 Начинаю искать утку!\n⏳ Это займет примерно {minutes} минут(ы). Потерпи немного..."
+            f"🔍 Начинаю искать утку!\n⏳ Это займёт примерно <b>{minutes} минут(ы)</b>.\nПотерпи немного, скоро вернусь с уткой! 🦆",
+            parse_mode="HTML"
         )
-        return
-
-    # Если таймер активен — показываем сколько осталось
-    remaining = int(user_timers[user_id]['end'] - now)
-    if remaining <= 0:
-        # Таймер закончился — выдаём утку
-        loot = get_random_loot()
-        if loot:
-            try:
+    else:
+        remaining = int(user_timers[user_id]['end'] - now)
+        if remaining <= 0:
+            loot = get_random_loot()
+            if loot:
                 with open(loot["photo_path"], 'rb') as photo:
                     await update.message.reply_photo(photo=photo, caption=loot["description"])
-            except Exception:
-                # Если фото не загрузилось — просто текстом
-                await update.message.reply_text(f"Вот твоя утка:\n{loot['description']}")
+            else:
+                await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
+            duration = random.randint(600, 3600)
+            user_timers[user_id]['end'] = now + duration
         else:
-            await update.message.reply_text("Сегодня утка не нашлась, попробуй позже.")
-
-        # Запускаем новый таймер после выдачи
-        duration = random.randint(600, 3600)
-        user_timers[user_id]['end'] = now + duration
-    else:
-        minutes = remaining // 60
-        seconds = remaining % 60
-        await update.message.reply_text(
-            f"🙈 Я всё ещё ищу утку!\n⏳ Осталось примерно {minutes} мин {seconds} сек."
-        )
-
-# === Flask сервер ===
+            minutes = remaining // 60
+            seconds = remaining % 60
+            await update.message.reply_text(
+                f"🙈 Я всё ещё ищу утку!\n⏱ Осталось: <b>{minutes} мин {seconds} сек</b>\nПотерпи немного... 🦆🔍",
+                parse_mode="HTML"
+            )
 
 @app.route('/')
 def home():
@@ -108,52 +92,47 @@ def home():
 @app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     json_update = request.get_json(force=True)
+    print("Получен update:", json_update)  # Логируем входящий update для отладки
     update = Update.de_json(json_update, bot)
 
-    loop = asyncio.get_event_loop()
+    # Безопасный запуск корутины в текущем loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     future = asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
     try:
         future.result(timeout=10)
     except Exception as e:
-        print(f"Ошибка в webhook: {e}")
+        print(f"Ошибка при обработке update: {e}")
 
     return "ok"
 
-# === Запуск Flask в отдельном потоке ===
-
-def run_flask():
+def run():
     port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
-    thread = Thread(target=run_flask)
+    thread = Thread(target=run)
     thread.start()
 
-# === Главная функция запуска ===
+async def main_async():
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.Regex(r"(?i)^кря$"), handle_krya))
 
-def main():
+    # Устанавливаем webhook
+    await application.initialize()
+    await application.bot.set_webhook(f"{URL}/{TOKEN}")
+    print("✅ Webhook установлен")
+
+    # Запускаем Flask в отдельном потоке, т.к. Application.run_polling() блокирует
     keep_alive()
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
+    print("✅ Бот запущен! Ждём обновлений...")
 
-    loop = asyncio.get_event_loop()
-
-    # Инициализация и запуск бота + установка webhook
-    loop.run_until_complete(application.initialize())
-    loop.run_until_complete(application.start())
-    loop.run_until_complete(bot.set_webhook(f"{URL}/{TOKEN}"))
-
-    print("✅ Бот запущен и webhook установлен!")
-
-    # Flask уже запущен в отдельном потоке, просто держим main активным
-    try:
-        while True:
-            time.sleep(10)
-    except KeyboardInterrupt:
-        print("Бот остановлен пользователем")
+    # Вечный цикл, чтобы не закрывался скрипт
+    while True:
+        await asyncio.sleep(10)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main_async())
 
 
