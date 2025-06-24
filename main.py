@@ -3,13 +3,11 @@ import time
 import asyncio
 from flask import Flask, request
 from telegram import Update, Bot
-from telegram.ext import (
-    Application, MessageHandler, ContextTypes, filters
-)
+from telegram.ext import Application, MessageHandler, ContextTypes, filters
 
-# === НАСТРОЙКИ ===
+# === Настройки ===
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-WEBHOOK_URL = f"https://sinklit-bot.onrender.com/{TOKEN}"
+WEBHOOK_URL = f"https://sinklit-bot.onrender.com/{TOKEN}"  # Укажи точный адрес Render-сайта
 
 # === Flask-приложение ===
 app = Flask(__name__)
@@ -18,10 +16,11 @@ app = Flask(__name__)
 application = Application.builder().token(TOKEN).build()
 bot = Bot(token=TOKEN)
 
-# === Обработка сообщения "кря" ===
+# === Переменные для редкой утки ===
 last_duck_time = 0
 duck_interval = 0
 
+# === Обработчик команды "кря" ===
 async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_duck_time, duck_interval
     now = time.time()
@@ -30,7 +29,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duck_interval = random.randint(600, 3600)
         last_duck_time = now
         await update.message.reply_text(
-            f"🦆 Появилась редкая утка! Следующая через {duck_interval // 60} мин."
+            f"🦆 Прилетела редкая утка Тодд Маприэль! Следующая через {duck_interval // 60} мин."
         )
     else:
         remaining = int(duck_interval - (now - last_duck_time))
@@ -38,29 +37,33 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⏳ До следующей редкой утки: {remaining // 60} мин {remaining % 60} сек."
         )
 
-# === Обработчик текста "кря" ===
+# === Обработка текстов ===
 application.add_handler(
     MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya)
 )
 
-# === Обработка webhook от Telegram ===
+# === Обработка Webhook-запроса от Telegram ===
 @app.post(f"/{TOKEN}")
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    asyncio.create_task(application.process_update(update))
-    return "ok", 200
+async def webhook():
+    try:
+        data = request.get_json(force=True)
+        update = Update.de_json(data, bot)
+        await application.process_update(update)
+        return "ok", 200
+    except Exception as e:
+        print("Ошибка в webhook:", e)
+        return "error", 500
 
-# === Точка входа ===
+# === Запуск ===
 if __name__ == "__main__":
-    async def run():
+    async def start():
         await application.initialize()
         await application.start()
         await bot.set_webhook(WEBHOOK_URL)
-        print("✅ Webhook установлен:", WEBHOOK_URL)
+        print("✅ Бот запущен, вебхук установлен.")
 
-    asyncio.run(run())
+    asyncio.run(start())
     app.run(host="0.0.0.0", port=8080)
-
 
 
 
