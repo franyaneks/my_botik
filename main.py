@@ -1,17 +1,36 @@
-import asyncio
 import random
 import time
 from flask import Flask, request
+from threading import Thread
+
 from telegram import Update, Bot
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Dispatcher
 )
-import requests
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
 
-app = Flask(__name__)
+# ====== KEEP_ALIVE (Flask) ======
+flask_app = Flask(__name__)
 
+@flask_app.route('/')
+def home():
+    return "Бот работает 24/7!"
+
+@flask_app.route(f'/{TOKEN}', methods=['POST'])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return 'ok'
+
+def run():
+    flask_app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# ====== Telegram Бот ======
 user_timers = {}
 
 loot_items = [
@@ -95,25 +114,19 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
 
-application = ApplicationBuilder().token(TOKEN).build()
-application.add_handler(CommandHandler("start", start))
-application.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
+if __name__ == '__main__':
+    keep_alive()
 
-@app.route('/')
-def index():
-    return "Бот работает!"
+    bot = Bot(token=TOKEN)
+    application = ApplicationBuilder().token(TOKEN).build()
 
-@app.route(f"/{TOKEN}", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), Bot(TOKEN))
-    asyncio.run(application.process_update(update))
-    return "OK"
+    dispatcher = application.dispatcher
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
 
-if __name__ == "__main__":
-    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://твое_имя_проекта.onrender.com/{TOKEN}"
-    res = requests.get(url)
-    print("Webhook setup:", res.text)
+    # Устанавливаем webhook на Render URL
+    url = "https://sinklit-bot.onrender.com"  # Твой публичный URL Render
+    bot.set_webhook(f"{url}/{TOKEN}")
 
-    app.run(host="0.0.0.0", port=8080)
-
-
+    print("✅ Бот запущен!")
+    flask_app.run(host="0.0.0.0", port=8080)
