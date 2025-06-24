@@ -24,7 +24,7 @@ loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "photo_path": "IMG_3704.jpeg",  # Фото должно быть в папке проекта
+        "photo_path": "IMG_3704.jpeg",  # Фото в проекте
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
     }
 ]
@@ -110,19 +110,18 @@ def keep_alive():
     thread = Thread(target=run)
     thread.start()
 
-def main():
+async def main():
     keep_alive()
     application.add_handler(CommandHandler("start", start))
-    # Исправлен Regex с флагом (?i) в начале
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    bot.set_webhook(f"{URL}/{TOKEN}")
+    await bot.set_webhook(f"{URL}/{TOKEN}")
 
     print("✅ Бот запущен!")
-    import time
     while True:
-        time.sleep(10)
+        await asyncio.sleep(10)
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
+
 
