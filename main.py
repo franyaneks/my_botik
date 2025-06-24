@@ -1,36 +1,22 @@
 import random
 import time
-from flask import Flask, request
+from flask import Flask
 from threading import Thread
 
-from telegram import Update, Bot
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
+URL = f"https://sinklit-bot.onrender.com/{TOKEN}"
 
-# ====== KEEP_ALIVE (Flask) ======
 flask_app = Flask(__name__)
 
 @flask_app.route('/')
 def home():
     return "Бот работает 24/7!"
 
-@flask_app.route(f'/{TOKEN}', methods=['POST'])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    asyncio.run(application.process_update(update))
-    return 'ok'
-
-def run():
-    flask_app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
-
-# ====== Telegram Бот ======
 user_timers = {}
 
 loot_items = [
@@ -42,11 +28,7 @@ loot_items = [
     }
 ]
 
-rarity_chances = {
-    "🟢": 60,
-    "🔵": 25,
-    "🔴": 15
-}
+rarity_chances = {"🟢": 60, "🔵": 25, "🔴": 15}
 
 def get_random_rarity():
     roll = random.randint(1, 100)
@@ -58,18 +40,13 @@ def get_random_rarity():
     return "🟢"
 
 def get_random_loot():
-    rarity = get_random_rarity()
-    filtered_items = [item for item in loot_items if item["rarity"] == rarity]
-    if filtered_items:
-        return random.choice(filtered_items)
-    else:
-        return None
+    filtered = [item for item in loot_items if item["rarity"] == get_random_rarity()]
+    return random.choice(filtered) if filtered else None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
     await update.message.reply_text(
-        f"👋 Привет, {username}!\n\n"
-        "Напиши 🦆 <b>кря</b>, чтобы я начал искать утку!",
+        f"👋 Привет, {username}!\nНапиши 🦆 кря, чтобы начать искать утку!",
         parse_mode="HTML"
     )
 
@@ -79,14 +56,10 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id not in user_timers or now >= user_timers[user_id]['end']:
         duration = random.randint(600, 3600)
-        end_time = now + duration
-        user_timers[user_id] = {'end': end_time}
-
+        user_timers[user_id] = {'end': now + duration}
         minutes = duration // 60
         await update.message.reply_text(
-            f"🔍 Начинаю искать утку!\n"
-            f"⏳ Это займёт примерно <b>{minutes} минут(ы)</b>.\n"
-            "Потерпи немного, скоро вернусь с уткой! 🦆",
+            f"🔍 Начинаю искать утку! Это займёт примерно {minutes} минут.",
             parse_mode="HTML"
         )
     else:
@@ -95,37 +68,25 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
             loot = get_random_loot()
             if loot:
                 with open(loot["photo_path"], 'rb') as photo:
-                    await update.message.reply_photo(
-                        photo=photo,
-                        caption=loot["description"]
-                    )
+                    await update.message.reply_photo(photo=photo, caption=loot["description"])
             else:
-                await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
-
-            duration = random.randint(600, 3600)
-            user_timers[user_id]['end'] = now + duration
+                await update.message.reply_text("Сегодня утка не нашлась, попробуй позже.")
+            user_timers[user_id]['end'] = now + random.randint(600, 3600)
         else:
             minutes = remaining // 60
             seconds = remaining % 60
             await update.message.reply_text(
-                f"🙈 Я всё ещё ищу утку!\n"
-                f"⏱ Осталось: <b>{minutes} мин {seconds} сек</b>\n"
-                "Потерпи немного... 🦆🔍",
+                f"⏳ Всё ещё ищу утку! Осталось {minutes} мин {seconds} сек.",
                 parse_mode="HTML"
             )
 
 if __name__ == '__main__':
-    import asyncio
-    keep_alive()
-
-    bot = Bot(token=TOKEN)
     application = ApplicationBuilder().token(TOKEN).build()
-
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
 
-    url = "https://sinklit-bot.onrender.com"
-    asyncio.run(bot.set_webhook(f"{url}/{TOKEN}"))
-
-    print("✅ Бот запущен!")
-    flask_app.run(host="0.0.0.0", port=8080)
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=8080,
+        webhook_url=URL
+    )
