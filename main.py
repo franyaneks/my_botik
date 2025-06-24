@@ -104,7 +104,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == '__main__':
     keep_alive()
 
-    app = ApplicationBuilder().token("ТВОЙ_ТОКЕН_ЗДЕСЬ").build()
+    app = ApplicationBuilder().token("7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4").build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
