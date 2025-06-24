@@ -2,6 +2,7 @@ import random
 import time
 import asyncio
 from threading import Thread
+
 from flask import Flask, request
 
 from telegram import Update, Bot
@@ -10,13 +11,13 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"  # Твой токен
-URL = "https://sinklit-bot.onrender.com"  # Твой Render URL
+TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
+URL = "https://sinklit-bot.onrender.com"  # твой URL Render
+
+app = Flask(__name__)
 
 bot = Bot(token=TOKEN)
 application = ApplicationBuilder().token(TOKEN).build()
-
-app = Flask(__name__)
 
 user_timers = {}
 
@@ -29,11 +30,7 @@ loot_items = [
     }
 ]
 
-rarity_chances = {
-    "🟢": 60,
-    "🔵": 25,
-    "🔴": 15
-}
+rarity_chances = {"🟢": 60, "🔵": 25, "🔴": 15}
 
 def get_random_rarity():
     roll = random.randint(1, 100)
@@ -46,10 +43,8 @@ def get_random_rarity():
 
 def get_random_loot():
     rarity = get_random_rarity()
-    filtered_items = [item for item in loot_items if item["rarity"] == rarity]
-    if filtered_items:
-        return random.choice(filtered_items)
-    return None
+    filtered = [item for item in loot_items if item["rarity"] == rarity]
+    return random.choice(filtered) if filtered else None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
@@ -97,8 +92,11 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    asyncio.run(application.process_update(update))
-    return 'ok'
+
+    # Запускаем обработку update в event loop безопасно из sync Flask
+    asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
+
+    return "ok"
 
 def run():
     app.run(host='0.0.0.0', port=8080)
@@ -112,15 +110,17 @@ def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    # Устанавливаем webhook один раз
+    # Инициализируем application и запускаем webhook
+    asyncio.get_event_loop().run_until_complete(application.initialize())
     asyncio.get_event_loop().run_until_complete(bot.set_webhook(f"{URL}/{TOKEN}"))
 
     print("✅ Бот запущен!")
+    # Flask уже запущен в отдельном потоке, просто ждём
     import time
     while True:
         time.sleep(10)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
 
