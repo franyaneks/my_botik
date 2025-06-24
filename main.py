@@ -1,119 +1,70 @@
-import random
-import time
 from flask import Flask
 from threading import Thread
-
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
-)
+from telegram.ext import Application, CommandHandler, ContextTypes
+import asyncio
+import random
+import time
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
 
-flask_app = Flask('')
+app = Flask(__name__)
+duck_timer = {}  # Словарь: user_id -> (время_конца, сообщение)
 
-@flask_app.route('/')
-def home():
-    return "Бот работает 24/7!"
+# Запускаем Flask-сервер для Render
+@app.route('/')
+def index():
+    return "Бот работает!"
 
-def run():
-    flask_app.run(host='0.0.0.0', port=8080)
+def run_flask():
+    app.run(host="0.0.0.0", port=8080)
 
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
-
-user_timers = {}
-
-loot_items = [
-    {
-        "name": "Утка Тадмавриэль",
-        "rarity": "🔵",
-        "photo_path": "IMG_3704.jpeg",
-        "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
-    }
-]
-
-rarity_chances = {
-    "🟢": 60,
-    "🔵": 25,
-    "🔴": 15
-}
-
-def get_random_rarity():
-    roll = random.randint(1, 100)
-    cumulative = 0
-    for rarity, chance in rarity_chances.items():
-        cumulative += chance
-        if roll <= cumulative:
-            return rarity
-    return "🟢"
-
-def get_random_loot():
-    rarity = get_random_rarity()
-    filtered_items = [item for item in loot_items if item["rarity"] == rarity]
-    if filtered_items:
-        return random.choice(filtered_items)
-    return None
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.effective_user.first_name
-    await update.message.reply_text(
-        f"👋 Привет, {username}!\n\n"
-        "Напиши 🦆 <b>кря</b>, чтобы я начал искать утку!",
-        parse_mode="HTML"
-    )
-
-async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# Команда "кря"
+async def krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     now = time.time()
 
-    if user_id not in user_timers:
-        duration = random.randint(600, 3600)
-        user_timers[user_id] = {'end': now + duration}
-        minutes = duration // 60
-        await update.message.reply_text(
-            f"🔍 Начинаю искать утку!\n"
-            f"⏳ Это займёт примерно <b>{minutes} минут(ы)</b>.\n"
-            "Потерпи немного, скоро вернусь с уткой! 🦆",
-            parse_mode="HTML"
-        )
-        return
-
-    remaining = int(user_timers[user_id]['end'] - now)
-    if remaining > 0:
-        minutes = remaining // 60
-        seconds = remaining % 60
-        await update.message.reply_text(
-            f"🙈 Я всё ещё ищу утку!\n"
-            f"⏱ Осталось: <b>{minutes} мин {seconds} сек</b>\n"
-            "Потерпи немного... 🦆🔍",
-            parse_mode="HTML"
-        )
+    if user_id not in duck_timer or now >= duck_timer[user_id][0]:
+        # Новый таймер
+        seconds = random.randint(600, 3600)  # от 10 мин до 1 часа
+        end_time = now + seconds
+        duck_timer[user_id] = (end_time, None)
+        await update.message.reply_text(f"🦆 Начал искать утку. Вернись через {seconds // 60} минут.")
     else:
-        loot = get_random_loot()
-        if loot:
-            with open(loot["photo_path"], 'rb') as photo:
-                await update.message.reply_photo(
-                    photo=photo,
-                    caption=loot["description"]
-                )
+        end_time, _ = duck_timer[user_id]
+        time_left = int(end_time - now)
+        if time_left > 0:
+            await update.message.reply_text(f"⏳ Осталось {time_left // 60} мин. и {time_left % 60} сек.")
         else:
-            await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
+            # Таймер завершён, утка найдена
+            duck = random.choice([
+                "🦆 Обычная утка",
+                "✨ Золотая утка",
+                "🌈 Радужная утка",
+                "🔥 Огненная утка"
+            ])
+            duck_timer[user_id] = (0, None)
+            await update.message.reply_text(f"🎉 Ты нашёл утку: {duck}\nНапиши 'кря', чтобы искать заново.")
 
-        duration = random.randint(600, 3600)
-        user_timers[user_id]['end'] = now + duration
-
-if __name__ == '__main__':
-    keep_alive()
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
-
+# Запуск Telegram-бота
+async def start_bot():
+    print("🔁 Запускаю бота...")
+    app_telegram = Application.builder().token(TOKEN).build()
+    app_telegram.add_handler(CommandHandler("start", krya))
+    app_telegram.add_handler(CommandHandler("кря", krya))
+    await app_telegram.initialize()
+    await app_telegram.start()
     print("✅ Бот запущен!")
-    app.run_polling()
+    await app_telegram.updater.start_polling()
+    await app_telegram.updater.idle()
+
+# Главный запуск
+if __name__ == "__main__":
+    # Запуск Flask в отдельном потоке
+    Thread(target=run_flask).start()
+
+    # Запуск Telegram бота
+    asyncio.run(start_bot())
 
 
 
