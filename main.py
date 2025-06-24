@@ -1,27 +1,17 @@
+import asyncio
 import random
 import time
-from flask import Flask
-from threading import Thread
-from telegram import Update
+from flask import Flask, request
+from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
+import requests
 
-# KEEP_ALIVE с Flask
-flask_app = Flask('')
+TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
 
-@flask_app.route('/')
-def home():
-    return "Бот работает 24/7!"
+app = Flask(__name__)
 
-def run():
-    flask_app.run(host='0.0.0.0', port=8080)
-
-def keep_alive():
-    t = Thread(target=run)
-    t.start()
-
-# Логика бота
 user_timers = {}
 
 loot_items = [
@@ -53,7 +43,8 @@ def get_random_loot():
     filtered_items = [item for item in loot_items if item["rarity"] == rarity]
     if filtered_items:
         return random.choice(filtered_items)
-    return None
+    else:
+        return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
@@ -69,7 +60,9 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id not in user_timers or now >= user_timers[user_id]['end']:
         duration = random.randint(600, 3600)
-        user_timers[user_id] = {'end': now + duration}
+        end_time = now + duration
+        user_timers[user_id] = {'end': end_time}
+
         minutes = duration // 60
         await update.message.reply_text(
             f"🔍 Начинаю искать утку!\n"
@@ -89,6 +82,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
             else:
                 await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
+
             duration = random.randint(600, 3600)
             user_timers[user_id]['end'] = now + duration
         else:
@@ -101,15 +95,25 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
 
-if __name__ == '__main__':
-    keep_alive()
+application = ApplicationBuilder().token(TOKEN).build()
+application.add_handler(CommandHandler("start", start))
+application.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
 
-    app = ApplicationBuilder().token("7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4").build()
+@app.route('/')
+def index():
+    return "Бот работает!"
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), Bot(TOKEN))
+    asyncio.run(application.process_update(update))
+    return "OK"
 
-    print("✅ Бот запущен!")
-    app.run_polling()
+if __name__ == "__main__":
+    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://твое_имя_проекта.onrender.com/{TOKEN}"
+    res = requests.get(url)
+    print("Webhook setup:", res.text)
+
+    app.run(host="0.0.0.0", port=8080)
 
 
