@@ -1,38 +1,55 @@
 import random
+import time
 import datetime
+from threading import Thread
 from flask import Flask, request
 from telegram import Update, Bot
 from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
+URL = "https://sinklit-bot.onrender.com"  # Твой URL на Render
+
 bot = Bot(TOKEN)
 app = Flask(__name__)
-application = Application.builder().token(TOKEN).build()
+application = ApplicationBuilder().token(TOKEN).build()
 
-next_duck_time = {}
+user_timers = {}
 
-def generate_duck_rarity():
+loot_items = [
+    {
+        "name": "Утка Тадмавриэль",
+        "rarity": "🔵",
+        "photo_path": "IMG_3704.jpeg",  # файл рядом с main.py
+        "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
+    }
+]
+
+rarity_chances = {
+    "🟢": 60,
+    "🔵": 25,
+    "🔴": 15
+}
+
+def get_random_rarity():
     roll = random.randint(1, 100)
-    if roll <= 50:
-        return "обычная"
-    elif roll <= 80:
-        return "редкая"
-    elif roll <= 95:
-        return "эпическая"
-    elif roll <= 99:
-        return "легендарная"
-    else:
-        return "мифическая"
+    cumulative = 0
+    for rarity, chance in rarity_chances.items():
+        cumulative += chance
+        if roll <= cumulative:
+            return rarity
+    return "🟢"
+
+def get_random_loot():
+    rarity = get_random_rarity()
+    filtered = [item for item in loot_items if item["rarity"] == rarity]
+    return random.choice(filtered) if filtered else None
 
 @app.route("/")
 def home():
-    return "Bot is running!"
+    return "Бот работает!"
 
 @app.route(f"/{TOKEN}", methods=["POST"])
 async def webhook():
@@ -41,35 +58,58 @@ async def webhook():
     return "ok"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Напиши 'кря', чтобы начать искать утку.")
+    username = update.effective_user.first_name
+    await update.message.reply_text(
+        f"Привет, {username}! Напиши 'кря', чтобы начать искать утку."
+    )
 
 async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    now = datetime.datetime.now()
+    now = time.time()
 
-    if user_id not in next_duck_time or now >= next_duck_time[user_id]:
-        minutes = random.randint(10, 60)
-        next_time = now + datetime.timedelta(minutes=minutes)
-        next_duck_time[user_id] = next_time
-        await update.message.reply_text(f"🦆 Ищу утку... Возвращайся через {minutes} минут!")
+    if user_id not in user_timers or now >= user_timers[user_id]['end']:
+        duration = random.randint(600, 3600)
+        user_timers[user_id] = {'end': now + duration}
+        minutes = duration // 60
+        await update.message.reply_text(
+            f"Начинаю искать утку! Это займет примерно {minutes} мин."
+        )
     else:
-        remaining = next_duck_time[user_id] - now
-        if remaining.total_seconds() <= 0:
-            rarity = generate_duck_rarity()
-            await update.message.reply_text(f"🎉 Поздравляю! Ты нашёл {rarity} утку!")
-            del next_duck_time[user_id]
+        remaining = int(user_timers[user_id]['end'] - now)
+        if remaining <= 0:
+            loot = get_random_loot()
+            if loot:
+                with open(loot["photo_path"], 'rb') as photo:
+                    await update.message.reply_photo(photo=photo, caption=loot["description"])
+            else:
+                await update.message.reply_text("Утка не найдена, попробуй позже.")
+            # Запускаем новый таймер после выдачи утки
+            duration = random.randint(600, 3600)
+            user_timers[user_id]['end'] = now + duration
         else:
-            minutes_left = int(remaining.total_seconds() // 60)
-            seconds_left = int(remaining.total_seconds() % 60)
+            minutes = remaining // 60
+            seconds = remaining % 60
             await update.message.reply_text(
-                f"⏳ До следующей утки осталось {minutes_left} мин {seconds_left} сек."
+                f"Утка еще не найдена. Осталось: {minutes} мин {seconds} сек."
             )
 
-def main():
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(?i)кря$"), handle_krya))
-
+def run_flask():
     app.run(host="0.0.0.0", port=8080)
+
+def keep_alive():
+    thread = Thread(target=run_flask)
+    thread.start()
+
+def main():
+    keep_alive()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
+    print("Бот запущен, ждем вебхук...")
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=8080,
+        webhook_url=f"{URL}/{TOKEN}"
+    )
 
 if __name__ == "__main__":
     main()
