@@ -6,7 +6,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 import asyncio
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # Замени на свой URL от Render
+URL = "https://sinklit-bot.onrender.com"  # Вставь сюда свой URL Render
 
 app = Flask(__name__)
 user_timers = {}
@@ -88,18 +88,15 @@ def home():
     return "Бот работает 24/7!"
 
 @app.route(f'/{TOKEN}', methods=['POST'])
-async def webhook():
+def webhook():
     if request.method == 'POST':
-        data = await request.get_data()
-        update = Update.de_json(data.decode('utf-8'), application.bot)
-        await application.process_update(update)
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        asyncio.run(application.process_update(update))
         return 'ok'
     else:
         abort(405)
 
 if __name__ == '__main__':
-    # Инициализируем и устанавливаем webhook
     asyncio.run(application.initialize())
     application.bot.set_webhook(f"{URL}/{TOKEN}")
-    # Запускаем Flask сервер
     app.run(host="0.0.0.0", port=8080)
