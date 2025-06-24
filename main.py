@@ -1,4 +1,3 @@
-import asyncio
 import random
 import datetime
 from flask import Flask, request
@@ -6,7 +5,9 @@ from telegram import Update, Bot
 from telegram.ext import (
     Application,
     CommandHandler,
+    MessageHandler,
     ContextTypes,
+    filters,
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
@@ -14,7 +15,6 @@ bot = Bot(TOKEN)
 app = Flask(__name__)
 application = Application.builder().token(TOKEN).build()
 
-# Храним время следующей утки для каждого пользователя
 next_duck_time = {}
 
 def generate_duck_rarity():
@@ -43,12 +43,11 @@ async def webhook():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Привет! Напиши 'кря', чтобы начать искать утку.")
 
-async def kray(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     now = datetime.datetime.now()
 
     if user_id not in next_duck_time or now >= next_duck_time[user_id]:
-        # Запускаем таймер
         minutes = random.randint(10, 60)
         next_time = now + datetime.timedelta(minutes=minutes)
         next_duck_time[user_id] = next_time
@@ -66,20 +65,11 @@ async def kray(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"⏳ До следующей утки осталось {minutes_left} мин {seconds_left} сек."
             )
 
-async def set_webhook():
-    url = "https://sinklit-bot.onrender.com/" + TOKEN
-    await bot.set_webhook(url=url)
-
 def main():
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("кря", kray))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(?i)кря$"), handle_krya))
 
-    # Устанавливаем webhook в фоне
-    asyncio.get_event_loop().create_task(set_webhook())
-
-    # Запускаем Flask
     app.run(host="0.0.0.0", port=8080)
 
 if __name__ == "__main__":
     main()
-
