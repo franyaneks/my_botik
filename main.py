@@ -1,62 +1,85 @@
+import asyncio
 import random
-import time
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+import datetime
+from flask import Flask, request
+from telegram import Update, Bot
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+)
 
-user_timers = {}
+TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
+bot = Bot(TOKEN)
+app = Flask(__name__)
+application = Application.builder().token(TOKEN).build()
 
-loot_items = [
-    {
-        "name": "Утка Тадмавриэль",
-        "rarity": "🔵",
-        "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
-    }
-]
+# Храним время следующей утки для каждого пользователя
+next_duck_time = {}
 
-def get_random_loot():
-    return random.choice(loot_items)
+def generate_duck_rarity():
+    roll = random.randint(1, 100)
+    if roll <= 50:
+        return "обычная"
+    elif roll <= 80:
+        return "редкая"
+    elif roll <= 95:
+        return "эпическая"
+    elif roll <= 99:
+        return "легендарная"
+    else:
+        return "мифическая"
+
+@app.route("/")
+def home():
+    return "Bot is running!"
+
+@app.route(f"/{TOKEN}", methods=["POST"])
+async def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    await application.process_update(update)
+    return "ok"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    username = update.effective_user.first_name
-    await update.message.reply_text(
-        f"👋 Привет, {username}!\nНапиши 'кря', чтобы я начал искать утку!"
-    )
+    await update.message.reply_text("Привет! Напиши 'кря', чтобы начать искать утку.")
 
-async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def kray(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    now = time.time()
+    now = datetime.datetime.now()
 
-    if user_id not in user_timers or now >= user_timers[user_id]:
-        duration = random.randint(600, 3600)  # от 10 минут до 1 часа
-        user_timers[user_id] = now + duration
-        minutes = duration // 60
-        await update.message.reply_text(
-            f"🔍 Начинаю искать утку! Это займёт примерно {minutes} минут(ы).\n"
-            "Потерпи немного, скоро вернусь с уткой! 🦆"
-        )
+    if user_id not in next_duck_time or now >= next_duck_time[user_id]:
+        # Запускаем таймер
+        minutes = random.randint(10, 60)
+        next_time = now + datetime.timedelta(minutes=minutes)
+        next_duck_time[user_id] = next_time
+        await update.message.reply_text(f"🦆 Ищу утку... Возвращайся через {minutes} минут!")
     else:
-        remaining = int(user_timers[user_id] - now)
-        if remaining > 0:
-            minutes = remaining // 60
-            seconds = remaining % 60
-            await update.message.reply_text(
-                f"🙈 Я всё ещё ищу утку!\nОсталось: {minutes} мин {seconds} сек.\nПотерпи немного... 🦆🔍"
-            )
+        remaining = next_duck_time[user_id] - now
+        if remaining.total_seconds() <= 0:
+            rarity = generate_duck_rarity()
+            await update.message.reply_text(f"🎉 Поздравляю! Ты нашёл {rarity} утку!")
+            del next_duck_time[user_id]
         else:
-            loot = get_random_loot()
-            await update.message.reply_text(f"Утка найдена!\n{loot['description']}")
-            user_timers[user_id] = 0  # сбросить таймер
+            minutes_left = int(remaining.total_seconds() // 60)
+            seconds_left = int(remaining.total_seconds() % 60)
+            await update.message.reply_text(
+                f"⏳ До следующей утки осталось {minutes_left} мин {seconds_left} сек."
+            )
 
-if __name__ == '__main__':
-    TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-    app = ApplicationBuilder().token(TOKEN).build()
+async def set_webhook():
+    url = "https://sinklit-bot.onrender.com/" + TOKEN
+    await bot.set_webhook(url=url)
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Regex("(?i)^кря$"), handle_krya))
+def main():
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("кря", kray))
 
-    print("✅ Бот запущен!")
-    app.run_polling()
+    # Устанавливаем webhook в фоне
+    asyncio.get_event_loop().create_task(set_webhook())
 
+    # Запускаем Flask
+    app.run(host="0.0.0.0", port=8080)
 
-
+if __name__ == "__main__":
+    main()
 
