@@ -1,6 +1,6 @@
 import random
 import time
-from flask import Flask, request
+from flask import Flask
 from threading import Thread
 
 from telegram import Update
@@ -11,8 +11,7 @@ from telegram.ext import (
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
 
-# ====== KEEP_ALIVE (Flask) ======
-flask_app = Flask(__name__)
+flask_app = Flask('')
 
 @flask_app.route('/')
 def home():
@@ -25,15 +24,13 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-# ====== Telegram Бот ======
-
 user_timers = {}
 
 loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "photo_path": r"C:\Users\navib\Downloads\photo_2025-06-09_15-48-23.jpg",  # Полный путь к картинке
+        "photo_path": "photo_2025-06-09_15-48-23.jpg",  # <-- путь к картинке в репозитории
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
     }
 ]
@@ -58,7 +55,8 @@ def get_random_loot():
     filtered_items = [item for item in loot_items if item["rarity"] == rarity]
     if filtered_items:
         return random.choice(filtered_items)
-    return None
+    else:
+        return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
@@ -74,8 +72,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id not in user_timers or now >= user_timers[user_id]['end']:
         duration = random.randint(600, 3600)
-        end_time = now + duration
-        user_timers[user_id] = {'end': end_time}
+        user_timers[user_id] = {'end': now + duration}
 
         minutes = duration // 60
         await update.message.reply_text(
@@ -97,6 +94,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
 
+            # Обновляем таймер для следующего поиска
             duration = random.randint(600, 3600)
             user_timers[user_id]['end'] = now + duration
         else:
