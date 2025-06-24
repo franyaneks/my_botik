@@ -1,17 +1,14 @@
-import asyncio
 import random
 import time
 from flask import Flask, request, abort
-from telegram import Update, Bot
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-)
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+import asyncio
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"
+URL = "https://sinklit-bot.onrender.com"  # Замени на свой URL от Render
 
-flask_app = Flask(__name__)
-
+app = Flask(__name__)
 user_timers = {}
 
 loot_items = [
@@ -48,8 +45,7 @@ def get_random_loot():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
     await update.message.reply_text(
-        f"👋 Привет, {username}!\n\n"
-        "Напиши 🦆 <b>кря</b>, чтобы я начал искать утку!",
+        f"👋 Привет, {username}!\n\nНапиши 🦆 <b>кря</b>, чтобы я начал искать утку!",
         parse_mode="HTML"
     )
 
@@ -62,8 +58,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_timers[user_id] = {'end': now + duration}
         minutes = duration // 60
         await update.message.reply_text(
-            f"🔍 Начинаю искать утку!\n⏳ Это займёт примерно <b>{minutes} минут(ы)</b>.\n"
-            "Потерпи немного, скоро вернусь с уткой! 🦆",
+            f"🔍 Начинаю искать утку!\n⏳ Это займёт примерно <b>{minutes} минут(ы)</b>.\nПотерпи немного, скоро вернусь с уткой! 🦆",
             parse_mode="HTML"
         )
     else:
@@ -80,8 +75,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
             minutes = remaining // 60
             seconds = remaining % 60
             await update.message.reply_text(
-                f"🙈 Я всё ещё ищу утку!\n⏱ Осталось: <b>{minutes} мин {seconds} сек</b>\n"
-                "Потерпи немного... 🦆🔍",
+                f"🙈 Я всё ещё ищу утку!\n⏱ Осталось: <b>{minutes} мин {seconds} сек</b>\nПотерпи немного... 🦆🔍",
                 parse_mode="HTML"
             )
 
@@ -93,20 +87,19 @@ application.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря
 def home():
     return "Бот работает 24/7!"
 
-@flask_app.route(f'/{TOKEN}', methods=['POST'])
+@app.route(f'/{TOKEN}', methods=['POST'])
 async def webhook():
-    if request.method == "POST":
+    if request.method == 'POST':
         data = await request.get_data()
-        update = Update.de_json(data.decode("utf-8"), application.bot)
+        update = Update.de_json(data.decode('utf-8'), application.bot)
         await application.process_update(update)
         return 'ok'
     else:
         abort(405)
 
 if __name__ == '__main__':
-    # Устанавливаем webhook (один раз)
-    import asyncio
+    # Инициализируем и устанавливаем webhook
     asyncio.run(application.initialize())
     application.bot.set_webhook(f"{URL}/{TOKEN}")
-    # Запуск Flask сервера
-    flask_app.run(host="0.0.0.0", port=8080)
+    # Запускаем Flask сервер
+    app.run(host="0.0.0.0", port=8080)
