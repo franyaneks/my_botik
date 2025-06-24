@@ -1,29 +1,30 @@
 import random
 import time
 import asyncio
-from flask import Flask, request
 from threading import Thread
+from flask import Flask, request
+
 from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters
 )
 
-TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # Твой URL на Render
+TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"  # Твой токен
+URL = "https://sinklit-bot.onrender.com"  # Твой Render URL
 
-# Flask приложение
-flask_app = Flask(__name__)
+bot = Bot(token=TOKEN)
+application = ApplicationBuilder().token(TOKEN).build()
 
-# Таймеры для пользователей
+app = Flask(__name__)
+
 user_timers = {}
 
-# Список уток (лоота)
 loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "photo_path": "IMG_3704.jpeg",  # Файл должен лежать в папке с main.py
+        "photo_path": "IMG_3704.jpeg",
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
     }
 ]
@@ -48,8 +49,7 @@ def get_random_loot():
     filtered_items = [item for item in loot_items if item["rarity"] == rarity]
     if filtered_items:
         return random.choice(filtered_items)
-    else:
-        return None
+    return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
@@ -63,9 +63,8 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
 
     if user_id not in user_timers or now >= user_timers[user_id]['end']:
-        duration = random.randint(600, 3600)  # 10-60 минут
+        duration = random.randint(600, 3600)
         user_timers[user_id] = {'end': now + duration}
-
         minutes = duration // 60
         await update.message.reply_text(
             f"🔍 Начинаю искать утку!\n⏳ Это займёт примерно <b>{minutes} минут(ы)</b>.\nПотерпи немного, скоро вернусь с уткой! 🦆",
@@ -76,18 +75,10 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if remaining <= 0:
             loot = get_random_loot()
             if loot:
-                try:
-                    with open(loot["photo_path"], 'rb') as photo:
-                        await update.message.reply_photo(photo=photo, caption=loot["description"])
-                except Exception as e:
-                    # Если фото не найдено, просто отправим текст
-                    await update.message.reply_text(
-                        f"{loot['name']}\nРедкость: {loot['rarity']}\n(Фото не найдено)"
-                    )
+                with open(loot["photo_path"], 'rb') as photo:
+                    await update.message.reply_photo(photo=photo, caption=loot["description"])
             else:
                 await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
-
-            # Новый таймер для следующего поиска
             duration = random.randint(600, 3600)
             user_timers[user_id]['end'] = now + duration
         else:
@@ -98,53 +89,39 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
 
-@flask_app.route('/')
+@app.route('/')
 def home():
     return "Бот работает 24/7!"
 
-@flask_app.route(f'/{TOKEN}', methods=['POST'])
+@app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    # process_update — асинхронная, запускаем через loop
-    asyncio.get_event_loop().run_until_complete(application.process_update(update))
+    asyncio.run(application.process_update(update))
     return 'ok'
 
-def run_flask():
-    flask_app.run(host='0.0.0.0', port=8080)
+def run():
+    app.run(host='0.0.0.0', port=8080)
 
 def keep_alive():
-    thread = Thread(target=run_flask)
-    thread.daemon = True
+    thread = Thread(target=run)
     thread.start()
 
-async def set_webhook():
-    # Установка вебхука
-    success = await bot.set_webhook(f"{URL}/{TOKEN}")
-    if success:
-        print(f"Webhook установлен на {URL}/{TOKEN}")
-    else:
-        print("Ошибка при установке webhook")
-
-if __name__ == '__main__':
-    # Инициализация бота и добавление хендлеров
-    application = ApplicationBuilder().token(TOKEN).build()
-    bot = application.bot
-
+def main():
+    keep_alive()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"^(?i)кря$"), handle_krya))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    keep_alive()  # Запускаем Flask в отдельном потоке
+    # Устанавливаем webhook один раз
+    asyncio.get_event_loop().run_until_complete(bot.set_webhook(f"{URL}/{TOKEN}"))
 
-    # Устанавливаем webhook (асинхронно)
-    asyncio.run(set_webhook())
-
-    print("Бот запущен и webhook установлен!")
-
-    # Чтобы скрипт не завершался — цикл ожидания
+    print("✅ Бот запущен!")
     import time
     while True:
         time.sleep(10)
+
+if __name__ == '__main__':
+    main()
 
 
 
