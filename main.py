@@ -2,7 +2,6 @@ import os
 import random
 import time
 import asyncio
-from threading import Thread
 
 from flask import Flask, request
 
@@ -12,12 +11,17 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # твой URL Render
+TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"  # твой токен
+URL = "https://sinklit-bot.onrender.com"  # твой публичный URL
 
 app = Flask(__name__)
 
 bot = Bot(token=TOKEN)
+
+# Создаём глобальный event loop
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 application = ApplicationBuilder().token(TOKEN).build()
 
 user_timers = {}
@@ -71,8 +75,11 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if remaining <= 0:
             loot = get_random_loot()
             if loot:
-                with open(loot["photo_path"], 'rb') as photo:
-                    await update.message.reply_photo(photo=photo, caption=loot["description"])
+                try:
+                    with open(loot["photo_path"], 'rb') as photo:
+                        await update.message.reply_photo(photo=photo, caption=loot["description"])
+                except FileNotFoundError:
+                    await update.message.reply_text("Фото утки не найдено, но ты получил утку!\n" + loot["description"])
             else:
                 await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
             duration = random.randint(600, 3600)
@@ -92,47 +99,29 @@ def home():
 @app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     json_update = request.get_json(force=True)
-    print("Получен update:", json_update)  # Логируем входящий update для отладки
     update = Update.de_json(json_update, bot)
 
-    # Безопасный запуск корутины в текущем loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    future = asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
-    try:
-        future.result(timeout=10)
-    except Exception as e:
-        print(f"Ошибка при обработке update: {e}")
+    # Запускаем обработку update в глобальном event loop
+    asyncio.run_coroutine_threadsafe(application.process_update(update), loop)
 
     return "ok"
-
-def run():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-def keep_alive():
-    thread = Thread(target=run)
-    thread.start()
 
 async def main_async():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    # Устанавливаем webhook
     await application.initialize()
-    await application.bot.set_webhook(f"{URL}/{TOKEN}")
+    await bot.set_webhook(f"{URL}/{TOKEN}")
     print("✅ Webhook установлен")
-
-    # Запускаем Flask в отдельном потоке, т.к. Application.run_polling() блокирует
-    keep_alive()
-
     print("✅ Бот запущен! Ждём обновлений...")
 
-    # Вечный цикл, чтобы не закрывался скрипт
-    while True:
-        await asyncio.sleep(10)
+if __name__ == '__main__':
+    # Запускаем инициализацию и webhook
+    loop.run_until_complete(main_async())
 
-if __name__ == "__main__":
-    asyncio.run(main_async())
+    # Запускаем Flask сервер на порту Render
+    port = int(os.environ.get("PORT", "8080"))
+    app.run(host='0.0.0.0', port=port)
+
 
 
