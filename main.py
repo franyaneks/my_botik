@@ -5,7 +5,7 @@ from threading import Thread
 
 from telegram import Update, Bot
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters, Dispatcher
+    ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
@@ -20,7 +20,7 @@ def home():
 @flask_app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
+    asyncio.run(application.process_update(update))
     return 'ok'
 
 def run():
@@ -115,18 +115,17 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
 if __name__ == '__main__':
+    import asyncio
     keep_alive()
 
     bot = Bot(token=TOKEN)
     application = ApplicationBuilder().token(TOKEN).build()
 
-    dispatcher = application.dispatcher
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex("(?i)^кря$"), handle_krya))
 
-    # Устанавливаем webhook на Render URL
-    url = "https://sinklit-bot.onrender.com"  # Твой публичный URL Render
-    bot.set_webhook(f"{url}/{TOKEN}")
+    url = "https://sinklit-bot.onrender.com"
+    asyncio.run(bot.set_webhook(f"{url}/{TOKEN}"))
 
     print("✅ Бот запущен!")
     flask_app.run(host="0.0.0.0", port=8080)
