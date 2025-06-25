@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # твой публичный URL Render
+URL = f"https://sinklit-bot.onrender.com"  # Твой публичный URL Render
 
 app = Flask(__name__)
 
@@ -25,7 +25,7 @@ loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "photo_path": "photo_2025-06-09_15-48-23.jpg",  # Имя файла из корня репозитория
+        "photo_path": "photo_2025-06-09_15-48-23.jpg",  # Имя файла с фото
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
     }
 ]
@@ -70,8 +70,11 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if remaining <= 0:
             loot = get_random_loot()
             if loot:
-                with open(loot["photo_path"], 'rb') as photo:
-                    await update.message.reply_photo(photo=photo, caption=loot["description"])
+                try:
+                    with open(loot["photo_path"], 'rb') as photo:
+                        await update.message.reply_photo(photo=photo, caption=loot["description"])
+                except Exception as e:
+                    await update.message.reply_text(f"Ошибка при отправке фото: {e}")
             else:
                 await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
             duration = random.randint(600, 3600)
@@ -121,5 +124,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
