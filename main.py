@@ -92,7 +92,6 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    # Для работы с python-telegram-bot 20.3 используем asyncio.create_task
     asyncio.create_task(application.process_update(update))
     return "ok"
 
@@ -119,8 +118,8 @@ def main():
 
     asyncio.run(run_bot())
 
-    # Основной цикл, чтобы приложение не завершалось
     asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":
     main()
+
