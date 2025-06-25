@@ -92,7 +92,7 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    asyncio.create_task(application.process_update(update))
+    asyncio.run(application.process_update(update))
     return "ok"
 
 def run():
@@ -101,6 +101,7 @@ def run():
 
 def keep_alive():
     thread = Thread(target=run)
+    thread.daemon = True
     thread.start()
 
 def main():
@@ -122,4 +123,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
