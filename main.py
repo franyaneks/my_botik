@@ -1,18 +1,18 @@
-import os
 import random
 import time
 import asyncio
 from threading import Thread
 
 from flask import Flask, request
+
 from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    ContextTypes, filters
+)
 
-# Вставь сюда свой токен Telegram-бота
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-
-# Вставь сюда публичный URL твоего сервиса на Render, например:
-URL = "https://sinklit-bot.onrender.com"  
+URL = "https://sinklit-bot.onrender.com"  # твой URL Render
 
 app = Flask(__name__)
 
@@ -92,27 +92,30 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    asyncio.run(application.process_update(update))
+    asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
     return "ok"
 
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    thread = Thread(target=run)
+    thread.start()
 
 def main():
+    keep_alive()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    asyncio.run(application.initialize())
-    asyncio.run(bot.set_webhook(f"{URL}/{TOKEN}"))
-    print("✅ Webhook установлен")
-    print("✅ Бот запущен! Ждём обновлений...")
+    async def run_bot():
+        await application.initialize()
+        await bot.set_webhook(f"{URL}/{TOKEN}")
+        print("✅ Бот запущен!")
 
-    Thread(target=run_flask).start()
+    asyncio.run(run_bot())
 
-    # Запускаем вечный цикл событий в главном потоке
-    asyncio.get_event_loop().run_forever()
+    while True:
+        time.sleep(10)
 
 if __name__ == "__main__":
     main()
-
