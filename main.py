@@ -1,18 +1,17 @@
 import os
 import random
 import time
-import asyncio
 from threading import Thread
 
 from flask import Flask, request
-from telegram import Update, Bot
+from telegram import Bot, Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # публичный URL Render
+URL = "https://sinklit-bot.onrender.com"  # ← твой render-сайт
 
 app = Flask(__name__)
 bot = Bot(token=TOKEN)
@@ -85,35 +84,38 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @app.route('/')
 def home():
-    return 'Бот работает!'
+    return "Бот работает 24/7!"
 
 @app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
-    json_update = request.get_json(force=True)
-    update = Update.de_json(json_update, bot)
-    asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
-    return 'ok'
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), bot)
+        application.update_queue.put_nowait(update)
+        return 'ok'
 
-def run_flask():
-    port = int(os.environ.get('PORT', 10000))
+def run():
+    port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
-def main():
-    # Flask сервер в отдельном потоке
-    Thread(target=run_flask).start()
+def keep_alive():
+    thread = Thread(target=run)
+    thread.start()
 
-    # Обработчики
+def main():
+    keep_alive()
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    # Установка Webhook
-    async def start_bot():
+    async def run_bot():
         await application.initialize()
         await application.start()
-        await bot.set_webhook(url=f"{URL}/{TOKEN}")
-        print("✅ Webhook установлен и бот работает.")
+        await bot.set_webhook(f"{URL}/{TOKEN}")
+        print("✅ Webhook установлен и бот запущен!")
 
-    asyncio.run(start_bot())
+    import asyncio
+    asyncio.run(run_bot())
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
+
