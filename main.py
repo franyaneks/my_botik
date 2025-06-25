@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"
+URL = "https://sinklit-bot.onrender.com"  # твой публичный URL Render
 
 app = Flask(__name__)
 
@@ -25,7 +25,7 @@ loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "photo_path": "IMG_3704.jpeg",
+        "photo_path": "photo_2025-06-09_15-48-23.jpg",  # Имя файла из корня репозитория
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
     }
 ]
@@ -92,7 +92,7 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    future = asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
+    asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
     return "ok"
 
 def run():
@@ -121,4 +121,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
