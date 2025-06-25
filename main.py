@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 TOKEN = "7009980344:AAFM5JEw8hH5cbemXSr44xj8928xoLVbDX8"
-URL = "https://dc18c4ec-2fa4-430a-a185-f4533114efbc-00-3lvgysxnpfear.spock.replit.dev"
+URL = "https://sinklit-bot.onrender.com"
 
 app = Flask(__name__)
 
