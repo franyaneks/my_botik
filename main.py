@@ -91,10 +91,10 @@ def home():
     return "Бот работает 24/7!"
 
 @app.route(f'/{TOKEN}', methods=['POST'])
-async def webhook():
+def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    await application.process_update(update)
+    asyncio.create_task(application.process_update(update))
     return "ok"
 
 def run_flask():
@@ -114,11 +114,9 @@ async def main():
     print("✅ Webhook установлен")
     print("✅ Бот запущен! Ждём обновлений...")
 
-    # Ждём бесконечно, чтобы программа не завершилась
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 
 
