@@ -92,7 +92,7 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    asyncio.run(application.process_update(update))
+    future = asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
     return "ok"
 
 def run():
@@ -101,27 +101,24 @@ def run():
 
 def keep_alive():
     thread = Thread(target=run)
-    thread.daemon = True
     thread.start()
 
 def main():
+    keep_alive()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    keep_alive()
-
     async def run_bot():
         await application.initialize()
-        await application.start()
         await bot.set_webhook(f"{URL}/{TOKEN}")
         print("✅ Webhook установлен")
         print("✅ Бот запущен! Ждём обновлений...")
 
     asyncio.run(run_bot())
 
-    asyncio.get_event_loop().run_forever()
+    while True:
+        time.sleep(10)
 
 if __name__ == "__main__":
     main()
-
 
