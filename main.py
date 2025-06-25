@@ -11,8 +11,9 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # твой публичный Render URL
+# Новый токен:
+TOKEN = "7907591643:AAGImUGU5nO9kTfS49a-lE1fdrBq34-t1ho"
+URL = "https://sinklit-bot.onrender.com"  # Заменить, если у тебя другой адрес Render
 
 app = Flask(__name__)
 
@@ -91,10 +92,10 @@ def home():
     return "Бот работает 24/7!"
 
 @app.route(f'/{TOKEN}', methods=['POST'])
-def webhook():
+async def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    asyncio.create_task(application.process_update(update))
+    await application.process_update(update)
     return "ok"
 
 def run_flask():
