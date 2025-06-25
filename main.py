@@ -1,37 +1,44 @@
+import os
+import asyncio
 import random
 import time
-import asyncio
 from threading import Thread
 
 from flask import Flask, request
-
 from telegram import Update, Bot
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
+# ТВОЙ ТОКЕН И URL
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # твой URL Render
+URL = "https://sinklit-bot.onrender.com"
 
+# Flask-приложение
 app = Flask(__name__)
-
 bot = Bot(token=TOKEN)
 application = ApplicationBuilder().token(TOKEN).build()
 
+# Хранилище таймеров по юзерам
 user_timers = {}
 
+# Предметы (лут)
 loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
         "photo_path": "IMG_3704.jpeg",
         "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
-    }
+    },
+    # Можно добавить другие утки с разной редкостью
 ]
 
-rarity_chances = {"🟢": 60, "🔵": 25, "🔴": 15}
+# Шансы выпадения редкости
+rarity_chances = {
+    "🟢": 60,  # обычная
+    "🔵": 25,  # редкая
+    "🔴": 15   # эпическая
+}
 
+# Функция определения редкости по шансам
 def get_random_rarity():
     roll = random.randint(1, 100)
     cumulative = 0
@@ -41,11 +48,13 @@ def get_random_rarity():
             return rarity
     return "🟢"
 
+# Функция получения случайного лута
 def get_random_loot():
     rarity = get_random_rarity()
     filtered = [item for item in loot_items if item["rarity"] == rarity]
     return random.choice(filtered) if filtered else None
 
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.first_name
     await update.message.reply_text(
@@ -53,12 +62,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="HTML"
     )
 
+# Обработка команды "кря"
 async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     now = time.time()
 
     if user_id not in user_timers or now >= user_timers[user_id]['end']:
-        duration = random.randint(600, 3600)
+        duration = random.randint(600, 3600)  # от 10 мин до 1 часа
         user_timers[user_id] = {'end': now + duration}
         minutes = duration // 60
         await update.message.reply_text(
@@ -84,38 +94,43 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
 
+# Главная страница
 @app.route('/')
 def home():
     return "Бот работает 24/7!"
 
+# Webhook от Telegram
 @app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
+    asyncio.run(application.process_update(update))
     return "ok"
 
-def run():
-    app.run(host='0.0.0.0', port=8080)
+# Flask в отдельном потоке
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
 
-def keep_alive():
-    thread = Thread(target=run)
-    thread.start()
-
+# Запуск бота
 def main():
-    keep_alive()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    async def run_bot():
-        await application.initialize()
-        await bot.set_webhook(f"{URL}/{TOKEN}")
-        print("✅ Бот запущен!")
+    asyncio.run(application.initialize())
+    asyncio.run(bot.set_webhook(f"{URL}/{TOKEN}"))
+    print("✅ Webhook установлен")
+    print("✅ Бот запущен! Ждём обновлений...")
 
-    asyncio.run(run_bot())
+    Thread(target=run_flask).start()
 
-    while True:
-        time.sleep(10)
+    # asyncio.get_event_loop() больше не используется в Python 3.11+
+    try:
+        asyncio.get_running_loop().run_forever()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
 
 if __name__ == "__main__":
     main()
