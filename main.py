@@ -1,21 +1,15 @@
+import os
+import asyncio
 import random
 import time
-import asyncio
 from threading import Thread
 
 from flask import Flask, request
-
 from telegram import Update, Bot
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    ContextTypes, filters
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-# ВАЖНО! ВСТАВЬ СЮДА СВОЙ ТОКЕН, КОТОРЫЙ ДАЛ @BotFather
-TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-
-# ТВОЙ URL, КУДА НАСТРОЕН ВЕБХУК (должен совпадать с URL Render)
-URL = "https://sinklit-bot.onrender.com"
+TOKEN = "ТВОЙ_ТОКЕН_ЗДЕСЬ"  # Вставь свой токен сюда
+URL = "https://sinklit-bot.onrender.com"  # Твой публичный URL Render без порта
 
 app = Flask(__name__)
 
@@ -95,38 +89,30 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-
-    # Обработка апдейта в безопасном потоке
-    asyncio.run_coroutine_threadsafe(application.process_update(update), asyncio.get_event_loop())
-
+    asyncio.run(application.process_update(update))
     return "ok"
 
-def run():
-    app.run(host='0.0.0.0', port=10000)
-
-def keep_alive():
-    thread = Thread(target=run)
-    thread.start()
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
 def main():
-    keep_alive()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    loop.run_until_complete(application.initialize())
-    loop.run_until_complete(bot.set_webhook(f"{URL}/{TOKEN}"))
-
+    asyncio.run(application.initialize())
+    asyncio.run(bot.set_webhook(f"{URL}/{TOKEN}"))
+    print("✅ Webhook установлен")
     print("✅ Бот запущен! Ждём обновлений...")
 
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        print("Бот остановлен")
+    # Запускаем Flask в отдельном потоке
+    Thread(target=run_flask).start()
+
+    # Чтобы основной поток не завершался
+    asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":
     main()
+
 
 
