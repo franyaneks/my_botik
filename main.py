@@ -12,10 +12,9 @@ from telegram.ext import (
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # твой публичный URL Render
+URL = "https://sinklit-bot.onrender.com"  # публичный URL Render
 
 app = Flask(__name__)
-
 bot = Bot(token=TOKEN)
 application = ApplicationBuilder().token(TOKEN).build()
 
@@ -86,38 +85,35 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @app.route('/')
 def home():
-    return "Бот работает 24/7!"
+    return 'Бот работает!'
 
 @app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
     asyncio.run_coroutine_threadsafe(application.process_update(update), application.loop)
-    return "ok"
+    return 'ok'
 
-def run():
-    port = int(os.environ.get('PORT', 8080))
+def run_flask():
+    port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-def keep_alive():
-    thread = Thread(target=run)
-    thread.start()
-
 def main():
-    keep_alive()
+    # Flask сервер в отдельном потоке
+    Thread(target=run_flask).start()
+
+    # Обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    async def run_bot():
+    # Установка Webhook
+    async def start_bot():
         await application.initialize()
-        await bot.set_webhook(f"{URL}/{TOKEN}")
-        print("✅ Webhook установлен")
-        print("✅ Бот запущен! Ждём обновлений...")
+        await application.start()
+        await bot.set_webhook(url=f"{URL}/{TOKEN}")
+        print("✅ Webhook установлен и бот работает.")
 
-    asyncio.run(run_bot())
+    asyncio.run(start_bot())
 
-    while True:
-        time.sleep(10)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
