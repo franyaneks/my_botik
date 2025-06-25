@@ -91,34 +91,34 @@ def home():
     return "Бот работает 24/7!"
 
 @app.route(f'/{TOKEN}', methods=['POST'])
-def webhook():
+async def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    asyncio.run(application.process_update(update))
+    await application.process_update(update)
     return "ok"
 
-def run():
+def run_flask():
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
-def keep_alive():
-    thread = Thread(target=run)
-    thread.start()
-
-def main():
-    keep_alive()
+async def main():
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
-    async def run_bot():
-        await application.initialize()
-        await bot.set_webhook(f"{URL}/{TOKEN}")
-        print("✅ Webhook установлен")
-        print("✅ Бот запущен! Ждём обновлений...")
+    await application.initialize()
+    await application.bot.set_webhook(f"{URL}/{TOKEN}")
 
-    asyncio.run(run_bot())
+    thread = Thread(target=run_flask)
+    thread.start()
+
+    print("✅ Webhook установлен")
+    print("✅ Бот запущен! Ждём обновлений...")
+
+    # Ждём бесконечно, чтобы программа не завершилась
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
+
 
 
