@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
-URL = "https://sinklit-bot.onrender.com"  # твой публичный URL Render
+URL = "https://sinklit-bot.onrender.com"  # твой публичный Render URL
 
 app = Flask(__name__)
 
@@ -25,7 +25,7 @@ loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
+        "description": "🦆 Утка Тадмавриэль\nРедкость: 🔵\n1/10\n\n<code>photo_2025-06-09_15-48-23.jpg</code>"
     }
 ]
 
@@ -69,7 +69,11 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if remaining <= 0:
             loot = get_random_loot()
             if loot:
-                await update.message.reply_text(loot["description"])
+                await update.message.reply_photo(
+                    photo="https://raw.githubusercontent.com/franyaneks/my_botik/main/photo_2025-06-09_15-48-23.jpg",
+                    caption=loot["description"],
+                    parse_mode="HTML"
+                )
             else:
                 await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
             duration = random.randint(600, 3600)
@@ -86,12 +90,11 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def home():
     return "Бот работает 24/7!"
 
-# async webhook для корректной работы на Render
 @app.route(f'/{TOKEN}', methods=['POST'])
-async def webhook():
-    json_update = await request.get_json(force=True)
+def webhook():
+    json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    await application.process_update(update)
+    asyncio.run(application.process_update(update))
     return "ok"
 
 def run():
@@ -114,9 +117,6 @@ def main():
         print("✅ Бот запущен! Ждём обновлений...")
 
     asyncio.run(run_bot())
-
-    while True:
-        time.sleep(10)
 
 if __name__ == "__main__":
     main()
