@@ -8,8 +8,8 @@ from flask import Flask, request
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-TOKEN = "ТВОЙ_ТОКЕН_ЗДЕСЬ"  # Вставь свой токен сюда
-URL = "https://sinklit-bot.onrender.com"  # Твой публичный URL Render без порта
+TOKEN = "7907591643:AAHzqBkgdUiCDaKRBO4_xGRzYhF56325Gi4"
+URL = "https://sinklit-bot.onrender.com"
 
 app = Flask(__name__)
 
@@ -23,11 +23,15 @@ loot_items = [
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
         "photo_path": "IMG_3704.jpeg",
-        "description": "Утка Тадмавриэль\nРедкость: 🔵\n1/10"
+        "description": "🦆 <b>Утка Тадмавриэль</b>\nРедкость: 🔵\nШанс: 1/10"
     }
 ]
 
-rarity_chances = {"🟢": 60, "🔵": 25, "🔴": 15}
+rarity_chances = {
+    "🟢": 60,  # обычная
+    "🔵": 25,  # редкая
+    "🔴": 15   # эпическая
+}
 
 def get_random_rarity():
     roll = random.randint(1, 100)
@@ -68,7 +72,7 @@ async def handle_krya(update: Update, context: ContextTypes.DEFAULT_TYPE):
             loot = get_random_loot()
             if loot:
                 with open(loot["photo_path"], 'rb') as photo:
-                    await update.message.reply_photo(photo=photo, caption=loot["description"])
+                    await update.message.reply_photo(photo=photo, caption=loot["description"], parse_mode="HTML")
             else:
                 await update.message.reply_text("Сегодня утка не нашлась, попробуй позже. 🦆")
             duration = random.randint(600, 3600)
@@ -105,10 +109,7 @@ def main():
     print("✅ Webhook установлен")
     print("✅ Бот запущен! Ждём обновлений...")
 
-    # Запускаем Flask в отдельном потоке
     Thread(target=run_flask).start()
-
-    # Чтобы основной поток не завершался
     asyncio.get_event_loop().run_forever()
 
 if __name__ == "__main__":
