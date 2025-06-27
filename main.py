@@ -4,15 +4,15 @@ import time
 import asyncio
 from threading import Thread
 
-from flask import Flask, request, jsonify
+from flask import Flask, request
 from telegram import Update, Bot
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     ContextTypes, filters
 )
 
-TOKEN = "7009980344:AAFM5JEw8hH5cbemXSr44xj8928xoLVbDX8"
-URL = "https://sinklit-bot.onrender.com"
+TOKEN = "7907591643:AAGImUGU5nO9kTfS49a-lE1fdrBq34-t1ho"
+URL = "https://dc18c4ec-2fa4-430a-a185-f4533114efbc-00-3lvgysxnpfear.spock.replit.dev"
 
 app = Flask(__name__)
 
@@ -25,7 +25,7 @@ loot_items = [
     {
         "name": "Утка Тадмавриэль",
         "rarity": "🔵",
-        "description": "🦆 Утка Тадмавриэль\nРедкость: 🔵\n1/10\n\n<code>photo_2025-06-09_15-48-23.jpg</code>"
+        "description": "🦆 Утка Тадмавриэль\nРедкость: 🔵\n1/10"
     }
 ]
 
@@ -94,8 +94,11 @@ def home():
 def webhook():
     json_update = request.get_json(force=True)
     update = Update.de_json(json_update, bot)
-    # Обработка обновления в текущем цикле событий asyncio
-    asyncio.get_event_loop().create_task(application.process_update(update))
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(application.process_update(update))
+
     return "ok"
 
 def run_flask():
@@ -103,13 +106,13 @@ def run_flask():
     app.run(host='0.0.0.0', port=port, use_reloader=False)
 
 async def main():
-    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^/start$"), start))
     application.add_handler(MessageHandler(filters.TEXT & filters.Regex(r"(?i)^кря$"), handle_krya))
 
     await application.initialize()
+    await application.start()
     await application.bot.set_webhook(f"{URL}/{TOKEN}")
 
-    # Запускаем Flask в отдельном потоке
     thread = Thread(target=run_flask)
     thread.start()
 
