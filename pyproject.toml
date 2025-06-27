@@ -1,15 +1,10 @@
-
-[tool.poetry]
-name = "sinklit-bot"
+[project]
+name = "python-template"
 version = "0.1.0"
 description = ""
-authors = ["yourname <youremail@example.com>"]
-
-[tool.poetry.dependencies]
-python = "^3.11"
-python-telegram-bot = "20.3"
-flask = "^3.1.1"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+authors = ["Your Name <you@example.com>"]
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.1.1",
+    "telegram>=0.0.1",
+]
